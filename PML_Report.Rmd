@@ -61,7 +61,7 @@ df_training2 <- df_training2[,-c(1:7)]
 # just memo:
 # df_training2 <- df_training2[, ! grepl("(X|user|timestamp|window)", names(df_training2))]
 
-# remove Near Zero Var
+# check to remove Near Zero Var
 nsv <- nearZeroVar(df_training2, saveMetrics = TRUE)
 ```
 
@@ -72,6 +72,14 @@ set.seed(32345)     # for repliction experiment
 inTrain <- createDataPartition(y=df_training2$classe, p=0.7, list=FALSE)
 training <- df_training2[inTrain,]
 testing <- df_training2[-inTrain,]
+```
+Patterns in rows and columns
+
+In general, with matrix data, there may be patterns that occur accross the rows and columns of the matrix. I can display this by looking at the row and column means of the data. It takes a like of histogram.
+
+```{r}
+# make histogram of rowmeans by classe
+qplot(x=rowMeans(df_training2[, -53]), fill=df_training2$classe, binwidth=2) + labs(x = "Row means", y = "count of Row means")
 ```
 
 # Fit modeling
@@ -116,6 +124,6 @@ varImpPlot(modFitRf, main="varImpPlot of Human Activity")
 ```
 
 OOB estimatate of error rate is about 0.5% in random forest model.
-When i predict testing data set, it is `r resultRf$overall[1]` accurrcy. Accuracy is over than 99%.
+When I predict testing data set, it is `r resultRf$overall[1]` accuracy. Accuracy is over than 99%.
 I think that it is very good model.
 
