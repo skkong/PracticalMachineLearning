@@ -1,0 +1,121 @@
+---
+title: "Practical Machine Learning Report"
+author: "Kong, Seok-kyu"
+date: "2015-10-25"
+output: html_document
+---
+
+# Summary
+
+The goal of this project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. I have fitted two models and compared its accuracy. First model, CART's accuracy is less than 60%. Second model, its accuracy is about 99% and OOB estimate of error rate is about 0.5%. I think that random forest model is fitted very well.
+
+# Pre-Processing
+
+Loading the training and test dataset from [Human Activity Recognition](http://groupware.les.inf.puc-rio.br/har)
+
+```{r}
+# the url of dataset
+url_training <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+url_testing <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+# local files
+fn_training <- "./data/pml-training.csv"
+fn_testing <- "./data/pml-testing.csv"
+
+# create directory of data
+if(! file.exists("./data"))
+    dir.create("./data")
+
+# loading dataset
+if(! file.exists(fn_training)) 
+{
+    download.file(url_training, destfile = fn_training, method="curl") 
+    download.file(url_testing, destfile = fn_testing, method="curl") 
+}
+
+# specify na strings for selecting effective columns
+df_training <- read.csv(fn_training, na.strings = c("", "NA"))
+df_testing <- read.csv(fn_testing, na.strings = c("", "NA"))
+
+## Feature Selection
+
+```
+
+Remove columns which have many NA's. For the general modeling, I removed the user name variable and others depending on personal feature.
+
+```{r, message=FALSE}
+library(caret)
+library(dplyr)
+library(ggplot2)
+library(rattle)             # for fancyRpartPlot()
+library(randomForest)       # for randomForest()
+
+# ignore the proportion of missing values over than 10%.
+count_na <- function (a) {mean(is.na(a))}    # count NA function
+df_training2 <- df_training[,sapply(df_training, count_na) < 0.1]    # select columns
+
+# remove columns which depend on personal features
+# so, now 53 columns.
+df_training2 <- df_training2[,-c(1:7)]    
+
+# just memo:
+# df_training2 <- df_training2[, ! grepl("(X|user|timestamp|window)", names(df_training2))]
+
+# remove Near Zero Var
+nsv <- nearZeroVar(df_training2, saveMetrics = TRUE)
+```
+
+## Data Splitting
+
+```{r}
+set.seed(32345)     # for repliction experiment
+inTrain <- createDataPartition(y=df_training2$classe, p=0.7, list=FALSE)
+training <- df_training2[inTrain,]
+testing <- df_training2[-inTrain,]
+```
+
+# Fit modeling
+
+I have fitted two models and compare its accuracy.
+
+## using rpart (CART, Classification and Regression Trees)
+
+```{r}
+modFitRpart <- train(classe ~ ., data=training, method="rpart")
+modFitRpart
+
+fancyRpartPlot(modFitRpart$finalModel)
+```
+
+```{r}
+pred_rpart <- predict(modFitRpart, newdata=testing)
+resultRpart <- confusionMatrix(pred_rpart, testing$classe)
+resultRpart$overall[1] 
+```
+
+It is `r resultRpart$overall[1]` accuracy. Its accuracy is less than 60% and is not so good model.
+
+## Using random forest 
+
+```{r, cache=TRUE}
+# modFit <- train(classe ~ ., data=training, method="rf", prox=TRUE)    # too slow
+modFitRf <- randomForest(classe ~ ., data=training, importance=TRUE)    # for evaluating variable importance
+modFitRf
+#getTree(modFitRf, k=2)
+```
+
+```{r}
+pred_rf <- predict(modFitRf, newdata=testing)
+resultRf <- confusionMatrix(pred_rf, testing$classe)
+table(pred_rf, testing$classe)
+```
+
+```{r}
+head(importance(modFitRf), 5)
+varImpPlot(modFitRf, main="varImpPlot of Human Activity")
+```
+
+OOB estimatate of error rate is about 0.5% in random forest model.
+When i predict testing data set, it is `r resultRf$overall[1]` accurrcy. Accuracy is over than 99%.
+I think that it is very good model.
+
